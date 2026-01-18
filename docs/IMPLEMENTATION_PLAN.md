@@ -6,73 +6,126 @@
 |-----------|----------|
 | **Tên dự án** | Student Study Planner |
 | **Thời gian** | 4 tuần |
-| **Tech Stack** | Next.js + Python (LangChain) + Firestore |
+| **Tech Stack** | Next.js (pnpm) + Django REST + LangChain + Firestore |
+| **Architecture** | Monorepo với shared configs |
 | **Team size đề xuất** | 1-2 developers |
 
 ---
 
-## 🏗️ Kiến trúc thư mục
+## 🏗️ Kiến trúc Monorepo
 
 ```
 planing_for_students/
-├── frontend/                    # Next.js Application
-│   ├── src/
-│   │   ├── app/                 # App Router (Next.js 14+)
-│   │   │   ├── page.tsx         # Home - Input form
-│   │   │   ├── plan/[id]/       # View saved plan
-│   │   │   ├── api/             # API Routes (proxy to Python)
-│   │   │   └── layout.tsx
-│   │   ├── components/
-│   │   │   ├── InputForm.tsx    # Syllabus/Todo input
-│   │   │   ├── PlanViewer.tsx   # Iframe renderer
-│   │   │   ├── LoadingState.tsx
-│   │   │   └── ActionButtons.tsx # Save/Regenerate
-│   │   ├── lib/
-│   │   │   ├── firebase.ts      # Firestore client
-│   │   │   └── api.ts           # API helpers
-│   │   └── types/
-│   │       └── plan.ts          # TypeScript interfaces
-│   ├── public/
-│   ├── next.config.js           # CSP headers config
-│   ├── tailwind.config.js
-│   └── package.json
+├── apps/
+│   ├── web/                         # Next.js Frontend (pnpm)
+│   │   ├── src/
+│   │   │   ├── app/                 # App Router (Next.js 14+)
+│   │   │   │   ├── page.tsx         # Home - Input form
+│   │   │   │   ├── plan/[id]/       # View saved plan
+│   │   │   │   └── layout.tsx
+│   │   │   ├── components/
+│   │   │   │   ├── InputForm.tsx    # Syllabus/Todo input
+│   │   │   │   ├── PlanViewer.tsx   # Iframe renderer
+│   │   │   │   ├── LoadingState.tsx
+│   │   │   │   └── ActionButtons.tsx
+│   │   │   ├── lib/
+│   │   │   │   ├── firebase.ts      # Firestore client
+│   │   │   │   └── api.ts           # API helpers
+│   │   │   └── types/
+│   │   │       └── plan.ts          # TypeScript interfaces
+│   │   ├── public/
+│   │   ├── next.config.js           # CSP headers config
+│   │   ├── tailwind.config.js
+│   │   └── package.json
+│   │
+│   └── api/                         # Django REST Backend (uv)
+│       ├── manage.py
+│       ├── pyproject.toml           # uv project config
+│       ├── uv.lock
+│       ├── config/
+│       │   ├── __init__.py
+│       │   ├── settings/
+│       │   │   ├── base.py
+│       │   │   ├── development.py
+│       │   │   └── production.py
+│       │   ├── urls.py
+│       │   └── wsgi.py
+│       ├── apps/
+│       │   ├── planner/             # Main planner app
+│       │   │   ├── views.py         # API views
+│       │   │   ├── serializers.py   # DRF serializers
+│       │   │   ├── urls.py
+│       │   │   └── services/
+│       │   │       ├── router.py    # LangChain Router
+│       │   │       ├── planner.py   # Plan generator
+│       │   │       └── coder.py     # HTML generator
+│       │   └── feedback/            # Tracking app
+│       │       ├── views.py
+│       │       ├── models.py
+│       │       └── serializers.py
+│       ├── core/
+│       │   ├── langchain/
+│       │   │   ├── chains.py        # Chain definitions
+│       │   │   └── prompts.py       # Prompt hub integration
+│       │   ├── langsmith/
+│       │   │   ├── client.py        # LangSmith client
+│       │   │   └── versioning.py    # Prompt versioning
+│       │   └── firebase/
+│       │       └── client.py        # Firestore client
+│       ├── tests/
+│       └── Dockerfile
 │
-├── backend/                     # Python LangChain Service
-│   ├── app/
-│   │   ├── main.py              # FastAPI entry point
-│   │   ├── routers/
-│   │   │   └── planner.py       # /generate endpoint
-│   │   ├── chains/
-│   │   │   ├── router_chain.py  # Easy/Hard classifier
-│   │   │   ├── planner_chain.py # Study plan generator
-│   │   │   └── coder_chain.py   # HTML/Tailwind generator
-│   │   ├── prompts/
-│   │   │   ├── router.py
-│   │   │   ├── planner.py
-│   │   │   └── coder.py
-│   │   ├── schemas/
-│   │   │   └── plan.py          # Pydantic models
-│   │   └── utils/
-│   │       ├── langsmith.py     # Tracing setup
-│   │       └── cache.py         # Context caching
-│   ├── tests/
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
+├── packages/                        # Shared packages
+│   └── shared-types/                # Shared TypeScript types
+│       ├── package.json
+│       └── src/
+│           └── plan.ts
 │
 ├── docs/
-│   ├── IMPLEMENTATION_PLAN.md   # This file
-│   ├── PROMPTS.md               # All prompt templates
-│   ├── API_SPEC.md              # API documentation
-│   └── EVALUATION.md            # F1 Score methodology
+│   ├── IMPLEMENTATION_PLAN.md       # This file
+│   ├── PROMPTS.md                   # Prompt templates (synced to LangSmith)
+│   ├── API_SPEC.md                  # API documentation
+│   └── EVALUATION.md                # F1 Score methodology
 │
 ├── scripts/
-│   ├── setup.sh                 # Dev environment setup
-│   └── deploy.sh                # Deployment script
+│   ├── setup.sh                     # Dev environment setup
+│   └── deploy.sh                    # Deployment script
 │
-├── docker-compose.yml           # Local development
+├── pnpm-workspace.yaml              # pnpm workspace config
+├── turbo.json                       # Turborepo config (optional)
+├── docker-compose.yml               # Local development
 ├── .gitignore
 └── README.md
+```
+
+---
+
+## 🔧 Công cụ & Package Manager
+
+### Frontend (pnpm)
+```bash
+# pnpm - Fast, disk-efficient package manager
+pnpm create next-app apps/web --typescript --tailwind --app
+
+# Workspace setup
+pnpm-workspace.yaml:
+  packages:
+    - 'apps/*'
+    - 'packages/*'
+```
+
+### Backend (uv)
+```bash
+# uv - Extremely fast Python package manager (by Astral)
+cd apps/api
+uv init
+uv add django djangorestframework
+uv add langchain langchain-google-genai langchain-openai
+uv add langsmith firebase-admin
+uv add python-dotenv httpx
+
+# Run with uv
+uv run python manage.py runserver
 ```
 
 ---
@@ -83,15 +136,18 @@ planing_for_students/
 > Mục tiêu: Input → AI → HTML hiển thị trong Iframe
 
 #### Ngày 1-2: Project Setup
-- [ ] Khởi tạo Next.js với TypeScript + Tailwind
-- [ ] Khởi tạo Python project với FastAPI + LangChain
+- [ ] Khởi tạo Monorepo với pnpm workspace
+- [ ] Khởi tạo Next.js (apps/web) với TypeScript + Tailwind
+- [ ] Khởi tạo Django project (apps/api) với uv
+- [ ] Setup Django REST Framework
 - [ ] Cấu hình Docker Compose cho local dev
 - [ ] Setup `.env` files với API keys
+- [ ] **Setup LangSmith Hub cho Prompt Versioning**
 
 #### Ngày 3-4: Core AI Logic
-- [ ] Viết Planner Prompt (Gemini Flash)
-- [ ] Viết Coder Prompt (HTML generator)
-- [ ] Implement `/generate` API endpoint
+- [ ] Push Planner Prompt lên LangSmith Hub
+- [ ] Push Coder Prompt lên LangSmith Hub
+- [ ] Implement Django `/api/generate` endpoint
 - [ ] Test với hardcoded input
 
 #### Ngày 5-7: Frontend Integration
@@ -103,6 +159,7 @@ planing_for_students/
 **Deliverable Tuần 1:**
 ```
 ✅ Sinh viên nhập syllabus → Nhận được HTML calendar/plan
+✅ Prompts được version control trên LangSmith Hub
 ✅ Chưa lưu database, chưa có Router
 ```
 
@@ -114,12 +171,12 @@ planing_for_students/
 #### Ngày 1-2: Database Setup
 - [ ] Tạo Firebase project
 - [ ] Thiết kế Firestore schema
-- [ ] Implement CRUD operations (Python)
+- [ ] Implement Django service layer cho Firestore
 
 #### Ngày 3-4: Save/Load Features
 - [ ] Nút "Save Plan" → Lưu Firestore
 - [ ] Trang `/plan/[id]` → Xem plan đã lưu
-- [ ] Realtime update khi AI đang generate
+- [ ] Django Channels cho Realtime (optional)
 
 #### Ngày 5-7: User Experience
 - [ ] Loading states & animations
@@ -140,7 +197,7 @@ planing_for_students/
 > Mục tiêu: Router phân loại + Multi-model
 
 #### Ngày 1-2: Router Chain
-- [ ] Viết Router Prompt (classifier)
+- [ ] Push Router Prompt lên LangSmith Hub
 - [ ] Implement RunnableBranch logic
 - [ ] Test cases: Easy vs Hard inputs
 
@@ -151,8 +208,8 @@ planing_for_students/
 
 #### Ngày 5-7: Optimization
 - [ ] Context caching (Gemini)
-- [ ] Response streaming
-- [ ] Rate limiting
+- [ ] Django async views cho streaming
+- [ ] Rate limiting với Django middleware
 
 **Deliverable Tuần 3:**
 ```
@@ -167,8 +224,8 @@ planing_for_students/
 > Mục tiêu: Logging, Evaluation, Production-ready
 
 #### Ngày 1-2: LangSmith Integration
-- [ ] Setup LangSmith tracing
-- [ ] Log tất cả chain executions
+- [ ] Full tracing cho tất cả chains
+- [ ] Prompt A/B testing với LangSmith Hub
 - [ ] Dashboard visualization
 
 #### Ngày 3-4: Evaluation Framework
@@ -179,13 +236,14 @@ planing_for_students/
 
 #### Ngày 5-7: Production Prep
 - [ ] Vercel deployment (Frontend)
-- [ ] Cloud Run/Railway deployment (Backend)
+- [ ] Cloud Run/Railway deployment (Django)
 - [ ] Environment variables setup
 - [ ] Monitoring & alerts
 
 **Deliverable Tuần 4:**
 ```
 ✅ Full observability với LangSmith
+✅ Prompt versioning & A/B testing
 ✅ Tự động đánh giá chất lượng
 ✅ Production deployment
 ```
@@ -194,15 +252,90 @@ planing_for_students/
 
 ## 🔧 Chi Tiết Kỹ Thuật
 
-### API Endpoints
+### Django Project Structure
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/generate` | Generate study plan |
-| GET | `/api/plans/{id}` | Get saved plan |
-| POST | `/api/plans` | Save new plan |
-| PUT | `/api/plans/{id}` | Update plan |
-| POST | `/api/feedback` | Log user action (save/regenerate) |
+```python
+# apps/api/config/settings/base.py
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'rest_framework',
+    'corsheaders',
+    'apps.planner',
+    'apps.feedback',
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
+}
+```
+
+### API Endpoints (Django REST)
+
+| Method | Endpoint | View | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/generate/` | `GeneratePlanView` | Generate study plan |
+| GET | `/api/v1/plans/{id}/` | `PlanDetailView` | Get saved plan |
+| POST | `/api/v1/plans/` | `PlanCreateView` | Save new plan |
+| PUT | `/api/v1/plans/{id}/` | `PlanUpdateView` | Update plan |
+| POST | `/api/v1/feedback/` | `FeedbackView` | Log user action |
+
+### LangSmith Prompt Versioning
+
+```python
+# core/langsmith/versioning.py
+from langsmith import Client
+from langchain import hub
+
+client = Client()
+
+class PromptManager:
+    """
+    Quản lý prompt versions trên LangSmith Hub
+    """
+    
+    PROMPT_REPO = "maisonhai3/student-planner"
+    
+    @classmethod
+    def get_prompt(cls, name: str, version: str = "latest"):
+        """
+        Pull prompt từ LangSmith Hub
+        
+        Args:
+            name: router | planner | coder | judge
+            version: specific version hoặc "latest"
+        """
+        prompt_name = f"{cls.PROMPT_REPO}/{name}"
+        if version != "latest":
+            prompt_name = f"{prompt_name}:{version}"
+        return hub.pull(prompt_name)
+    
+    @classmethod
+    def push_prompt(cls, name: str, prompt, description: str = ""):
+        """
+        Push prompt mới lên LangSmith Hub
+        """
+        hub.push(
+            f"{cls.PROMPT_REPO}/{name}",
+            prompt,
+            description=description
+        )
+    
+    @classmethod
+    def list_versions(cls, name: str):
+        """
+        List tất cả versions của một prompt
+        """
+        return client.list_prompts(
+            prompt_name=f"{cls.PROMPT_REPO}/{name}"
+        )
+```
 
 ### Firestore Schema
 
@@ -226,7 +359,12 @@ planing_for_students/
     updated_at: Timestamp,
     regenerate_count: 0,
     is_saved: false,
-    router_decision: "easy" | "hard"
+    router_decision: "easy" | "hard",
+    prompt_versions: {
+      router: "v1.2",
+      planner: "v2.0",
+      coder: "v1.5"
+    }
   }
 }
 
@@ -234,24 +372,41 @@ planing_for_students/
 {
   plan_id: "reference",
   action: "save" | "regenerate" | "share",
-  timestamp: Timestamp
+  timestamp: Timestamp,
+  prompt_versions: {}  // Track which prompt version was used
 }
 ```
 
 ### Environment Variables
 
 ```bash
-# Frontend (.env.local)
+# apps/web/.env.local (Frontend)
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_FIREBASE_CONFIG={}
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 
-# Backend (.env)
+# apps/api/.env (Backend)
+# Django
+DJANGO_SECRET_KEY=
+DJANGO_DEBUG=true
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+
+# AI Models
 GOOGLE_API_KEY=           # Gemini
 OPENAI_API_KEY=           # GPT-4o
-LANGSMITH_API_KEY=        # Tracing
-LANGSMITH_PROJECT=student-planner
-FIREBASE_CREDENTIALS=     # Service account JSON
-REDIS_URL=                # Optional: caching
+
+# LangSmith (Tracing + Prompt Versioning)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_PROJECT=student-planner
+LANGSMITH_API_KEY=
+LANGSMITH_HUB_REPO=maisonhai3/student-planner
+
+# Firebase
+FIREBASE_PROJECT_ID=
+GOOGLE_APPLICATION_CREDENTIALS=./firebase-credentials.json
+
+# Redis (Optional)
+REDIS_URL=redis://localhost:6379
 ```
 
 ---
@@ -266,6 +421,7 @@ REDIS_URL=                # Optional: caching
 - [ ] Router accuracy > 85%
 - [ ] F1 Score > 0.7 (dựa trên Save/Regenerate ratio)
 - [ ] Cost per request < $0.05
+- [ ] Prompt iteration cycle < 5 minutes (thanks to LangSmith Hub)
 
 ### Post-Launch
 - [ ] User retention (return within 7 days) > 30%
@@ -281,7 +437,8 @@ REDIS_URL=                # Optional: caching
 | XSS through Iframe | Critical | Strict CSP + sandbox |
 | API costs exceed budget | Medium | Rate limiting + caching |
 | Gemini API downtime | Medium | Fallback to GPT-4o |
-| Slow response time | Medium | Streaming + loading UX |
+| Slow response time | Medium | Django async + streaming |
+| Prompt regression | Medium | LangSmith versioning + A/B test |
 
 ---
 
@@ -295,12 +452,13 @@ REDIS_URL=                # Optional: caching
 ### Cần từ DevOps/Infra
 - [ ] Firebase project created
 - [ ] Vercel team/project setup
+- [ ] LangSmith organization setup
 - [ ] Domain name (nếu cần)
 
 ### Cần từ Developer
 - [ ] Gemini API key (Google AI Studio)
 - [ ] OpenAI API key
-- [ ] LangSmith account
+- [ ] LangSmith account + Hub access
 
 ---
 
@@ -315,9 +473,35 @@ cd /home/maihai/Projects/planing_for_students
 
 # Start development
 docker-compose up -d
+
+# Hoặc chạy riêng
+# Terminal 1 - Backend
+cd apps/api && uv run python manage.py runserver
+
+# Terminal 2 - Frontend
+cd apps/web && pnpm dev
 ```
 
 ---
 
-*Document version: 1.0*  
-*Last updated: 2026-01-18*
+## 🔄 LangSmith Prompt Workflow
+
+```
+1. Edit prompt locally (docs/PROMPTS.md)
+           ↓
+2. Test locally với sample inputs
+           ↓
+3. Push to LangSmith Hub (versioned)
+           ↓
+4. A/B test in production (5% traffic)
+           ↓
+5. Monitor metrics (F1 Score per version)
+           ↓
+6. Promote winning version to 100%
+```
+
+---
+
+*Document version: 2.0*  
+*Last updated: 2026-01-18*  
+*Changes: Migrated to Monorepo, pnpm, uv, Django REST, LangSmith Prompt Versioning*

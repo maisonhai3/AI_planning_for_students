@@ -1,6 +1,7 @@
 # 📊 Evaluation Methodology
 
 > Hướng dẫn đánh giá chất lượng hệ thống Study Planner sử dụng F1 Score
+> Tích hợp với **LangSmith** cho tracing và prompt versioning
 
 ---
 
@@ -90,7 +91,135 @@ f1 = 2 * (0.684 * 0.80) / (0.684 + 0.80)
 
 ---
 
-## 4. LLM-as-a-Judge Pipeline
+## 4. LangSmith Integration
+
+### 4.1 Tracing Setup (Django)
+
+```python
+# core/langsmith/client.py
+import os
+from langsmith import Client
+from langsmith.wrappers import wrap_openai
+from functools import wraps
+
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "student-planner"
+
+client = Client()
+
+class LangSmithClient:
+    """
+    LangSmith client cho tracing và evaluation
+    """
+    
+    def __init__(self):
+        self.client = Client()
+        self.project_name = os.getenv("LANGCHAIN_PROJECT", "student-planner")
+    
+    def log_feedback(self, run_id: str, action: str, score: float = None):
+        """
+        Log user feedback to LangSmith run
+        """
+        if score is None:
+            score = 1.0 if action == "save" else 0.0
+            
+        self.client.create_feedback(
+            run_id=run_id,
+            key="user_action",
+            value=action,
+            score=score,
+        )
+    
+    def create_dataset_from_runs(self, name: str, days: int = 7):
+        """
+        Tạo evaluation dataset từ runs gần đây
+        """
+        from datetime import datetime, timedelta
+        
+        runs = self.client.list_runs(
+            project_name=self.project_name,
+            start_time=datetime.now() - timedelta(days=days),
+            filter='has(feedback_keys, "user_action")'
+        )
+        
+        dataset = self.client.create_dataset(name)
+        
+        for run in runs:
+            self.client.create_example(
+                dataset_id=dataset.id,
+                inputs=run.inputs,
+                outputs=run.outputs,
+                metadata={
+                    "user_action": run.feedback_stats.get("user_action"),
+                    "prompt_versions": run.extra.get("prompt_versions", {})
+                }
+            )
+        
+        return dataset
+```
+
+### 4.2 Tracing Decorator for Django Views
+
+```python
+# core/langsmith/decorators.py
+from langsmith import traceable
+from functools import wraps
+
+def trace_generation(func):
+    """
+    Decorator để trace generation requests
+    """
+    @wraps(func)
+    @traceable(
+        name="generate_plan",
+        run_type="chain",
+        tags=["production"]
+    )
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+```
+
+### 4.3 Usage in Django Service
+
+```python
+# apps/planner/services/planner.py
+from langsmith import traceable
+from core.langsmith.versioning import PromptManager
+
+class PlannerService:
+    def __init__(self):
+        self.prompt_versions = PromptManager.get_current_versions()
+    
+    @traceable(name="route_request", run_type="chain")
+    def route(self, user_input: str) -> str:
+        """Route request to appropriate model"""
+        router_prompt = PromptManager.get_prompt("router")
+        # ... implementation
+        
+    @traceable(name="generate_plan", run_type="chain")
+    def generate(self, input_data: dict) -> dict:
+        """Generate study plan"""
+        # Traces are automatically sent to LangSmith
+        complexity = self.route(input_data["syllabus"])
+        
+        if complexity == "easy":
+            plan = self._generate_with_flash(input_data)
+        else:
+            plan = self._generate_with_gpt4(input_data)
+        
+        html = self._generate_html(plan)
+        
+        return {
+            "plan": plan,
+            "html": html,
+            "prompt_versions": self.prompt_versions
+        }
+```
+
+---
+
+## 5. LLM-as-a-Judge Pipeline
 
 ### Khi nào chạy Judge?
 
@@ -119,118 +248,267 @@ f1 = 2 * (0.684 * 0.80) / (0.684 + 0.80)
 └─────────────────┘
 ```
 
-### Sampling Strategy
+### Django Celery Task for Evaluation
 
 ```python
-def should_sample_for_judge(plan_metadata: dict) -> bool:
+# apps/feedback/tasks.py
+from celery import shared_task
+from langsmith import Client
+from langsmith.evaluation import evaluate
+from core.langsmith.versioning import PromptManager
+
+client = Client()
+
+@shared_task
+def evaluate_sample_plans():
     """
-    Quyết định có gửi plan này cho Judge không.
+    Celery task chạy mỗi ngày để evaluate 5% plans
     """
+    from datetime import datetime, timedelta
+    
+    # Get yesterday's runs
+    runs = list(client.list_runs(
+        project_name="student-planner",
+        start_time=datetime.now() - timedelta(days=1),
+        end_time=datetime.now(),
+        run_type="chain",
+        filter='eq(name, "generate_plan")'
+    ))
+    
+    # Sample 5%
     import random
+    sample_size = max(1, len(runs) // 20)
+    sampled_runs = random.sample(runs, sample_size)
     
-    # Base rate: 5%
-    if random.random() > 0.05:
-        return False
+    # Evaluate with Judge
+    judge_prompt = PromptManager.get_prompt("judge")
     
-    # Ưu tiên sample các cases thú vị
-    priority_cases = [
-        plan_metadata.get("regenerate_count", 0) >= 2,  # Nhiều regenerate
-        plan_metadata.get("router_decision") == "hard", # Complex inputs
-        plan_metadata.get("model_used") == "gpt-4o",    # Expensive model
-    ]
-    
-    if any(priority_cases):
-        return random.random() < 0.20  # 20% cho priority cases
-    
-    return True
-```
+    for run in sampled_runs:
+        evaluate_single_run.delay(run.id)
 
-### Judge Evaluation Code
-
-```python
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field
-from typing import Literal
-
-class JudgeScore(BaseModel):
-    completeness: int = Field(ge=1, le=5)
-    feasibility: int = Field(ge=1, le=5)
-    pedagogical_soundness: int = Field(ge=1, le=5)
-    clarity: int = Field(ge=1, le=5)
-    personalization: int = Field(ge=1, le=5)
-    overall_score: float = Field(ge=1.0, le=5.0)
-    verdict: Literal["good", "acceptable", "poor"]
-    feedback: str
-    
-async def evaluate_plan(
-    original_input: str,
-    generated_plan: dict,
-    user_action: str
-) -> JudgeScore:
+@shared_task
+def evaluate_single_run(run_id: str):
     """
-    Đánh giá chất lượng plan bằng GPT-4o.
+    Evaluate một run với LLM-as-a-Judge
     """
+    from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel
+    
+    run = client.read_run(run_id)
+    
+    class JudgeScore(BaseModel):
+        completeness: int
+        feasibility: int
+        pedagogical_soundness: int
+        clarity: int
+        personalization: int
+        overall_score: float
+        verdict: str
+    
     llm = ChatOpenAI(model="gpt-4o", temperature=0)
-    structured_llm = llm.with_structured_output(JudgeScore)
+    judge_prompt = PromptManager.get_prompt("judge")
     
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", JUDGE_SYSTEM_PROMPT),
-        ("human", JUDGE_USER_TEMPLATE)
-    ])
+    chain = judge_prompt | llm.with_structured_output(JudgeScore)
     
-    chain = prompt | structured_llm
-    
-    result = await chain.ainvoke({
-        "original_input": original_input,
-        "generated_plan": json.dumps(generated_plan, ensure_ascii=False),
-        "user_action": user_action
+    result = chain.invoke({
+        "original_input": run.inputs.get("user_input", ""),
+        "generated_plan": run.outputs.get("plan", {}),
+        "user_action": "unknown"  # Will be filled from feedback
     })
     
-    return result
+    # Log evaluation result
+    client.create_feedback(
+        run_id=run_id,
+        key="judge_score",
+        score=result.overall_score / 5.0,  # Normalize to 0-1
+        value=result.model_dump()
+    )
 ```
 
 ---
 
-## 5. Metrics Dashboard
+## 6. Prompt Version A/B Testing
 
-### Daily Metrics
+### Setup A/B Test
 
 ```python
+# core/langsmith/ab_testing.py
+import random
+from langsmith import Client
+from typing import Literal
+
+client = Client()
+
+class PromptABTest:
+    """
+    A/B testing cho prompt versions
+    """
+    
+    def __init__(self, prompt_name: str, control_version: str, treatment_version: str, traffic_split: float = 0.5):
+        self.prompt_name = prompt_name
+        self.control = control_version
+        self.treatment = treatment_version
+        self.traffic_split = traffic_split
+    
+    def get_variant(self, session_id: str) -> tuple[str, Literal["control", "treatment"]]:
+        """
+        Deterministic assignment based on session_id
+        Returns (version_hash, variant_name)
+        """
+        # Consistent hashing for same user always gets same variant
+        hash_value = hash(session_id) % 100
+        
+        if hash_value < (self.traffic_split * 100):
+            return self.treatment, "treatment"
+        else:
+            return self.control, "control"
+    
+    def log_variant(self, run_id: str, variant: str):
+        """Log which variant was used"""
+        client.create_feedback(
+            run_id=run_id,
+            key=f"ab_test_{self.prompt_name}",
+            value=variant
+        )
+    
+    def analyze_results(self) -> dict:
+        """
+        Analyze A/B test results from LangSmith
+        """
+        control_runs = list(client.list_runs(
+            project_name="student-planner",
+            filter=f'has(feedback_keys, "ab_test_{self.prompt_name}") and eq(feedback_values.ab_test_{self.prompt_name}, "control")'
+        ))
+        
+        treatment_runs = list(client.list_runs(
+            project_name="student-planner", 
+            filter=f'has(feedback_keys, "ab_test_{self.prompt_name}") and eq(feedback_values.ab_test_{self.prompt_name}, "treatment")'
+        ))
+        
+        def calculate_save_rate(runs):
+            saves = sum(1 for r in runs if r.feedback_stats.get("user_action") == "save")
+            return saves / len(runs) if runs else 0
+        
+        control_rate = calculate_save_rate(control_runs)
+        treatment_rate = calculate_save_rate(treatment_runs)
+        
+        return {
+            "control_save_rate": control_rate,
+            "treatment_save_rate": treatment_rate,
+            "improvement": (treatment_rate - control_rate) / control_rate if control_rate > 0 else 0,
+            "control_n": len(control_runs),
+            "treatment_n": len(treatment_runs),
+            "recommendation": "treatment" if treatment_rate > control_rate else "control"
+        }
+```
+
+### Usage in Service
+
+```python
+# apps/planner/services/planner.py
+from core.langsmith.ab_testing import PromptABTest
+
+class PlannerService:
+    def __init__(self):
+        # A/B test for planner prompt
+        self.planner_ab_test = PromptABTest(
+            prompt_name="planner",
+            control_version="abc123",  # Current production
+            treatment_version="def456", # New version to test
+            traffic_split=0.1  # 10% get new version
+        )
+    
+    def generate(self, input_data: dict, session_id: str):
+        # Get A/B variant
+        version, variant = self.planner_ab_test.get_variant(session_id)
+        
+        # Use the assigned version
+        planner_prompt = PromptManager.get_prompt("planner", version=version)
+        
+        # ... generate plan ...
+        
+        # Log variant for analysis
+        self.planner_ab_test.log_variant(run_id, variant)
+```
+
+---
+
+## 7. Metrics Dashboard
+
+### Daily Metrics Calculation (Django Management Command)
+
+```python
+# apps/feedback/management/commands/calculate_metrics.py
+from django.core.management.base import BaseCommand
+from langsmith import Client
+from datetime import datetime, timedelta
+from dataclasses import dataclass
+
 @dataclass
 class DailyMetrics:
     date: str
     total_generations: int
-    unique_users: int
-    
-    # Core metrics
+    unique_sessions: int
     save_count: int
     regenerate_count: int
     abandon_count: int
-    
-    # Calculated
-    @property
-    def precision(self) -> float:
-        denom = self.save_count + self.regenerate_count
-        return self.save_count / denom if denom > 0 else 0
-    
-    # Cost metrics
-    gemini_flash_calls: int
-    gpt4o_calls: int
-    total_cost_usd: float
-    
-    # Performance
+    precision: float
+    f1_score: float
     avg_response_time_ms: int
-    p95_response_time_ms: int
+    total_cost_usd: float
+    prompt_versions: dict
+
+class Command(BaseCommand):
+    help = 'Calculate daily metrics from LangSmith'
     
-    # Router accuracy
-    router_easy_correct: int  # Easy → Flash → Saved
-    router_hard_correct: int  # Hard → GPT4 → Saved
-    router_easy_wrong: int    # Easy → Flash → Regenerated
-    router_hard_wrong: int    # Hard → GPT4 → Regenerated
+    def handle(self, *args, **options):
+        client = Client()
+        
+        yesterday = datetime.now() - timedelta(days=1)
+        
+        runs = list(client.list_runs(
+            project_name="student-planner",
+            start_time=yesterday,
+            end_time=datetime.now(),
+            run_type="chain",
+            filter='eq(name, "generate_plan")'
+        ))
+        
+        # Calculate metrics
+        save_count = sum(1 for r in runs if r.feedback_stats.get("user_action") == "save")
+        regenerate_count = sum(1 for r in runs if r.feedback_stats.get("user_action") == "regenerate")
+        
+        precision = save_count / (save_count + regenerate_count) if (save_count + regenerate_count) > 0 else 0
+        
+        # Get recall from judge scores
+        judged_runs = [r for r in runs if r.feedback_stats.get("judge_score")]
+        recall = sum(r.feedback_stats["judge_score"]["score"] for r in judged_runs) / len(judged_runs) if judged_runs else 0.8
+        
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        
+        metrics = DailyMetrics(
+            date=yesterday.strftime("%Y-%m-%d"),
+            total_generations=len(runs),
+            unique_sessions=len(set(r.inputs.get("session_id") for r in runs)),
+            save_count=save_count,
+            regenerate_count=regenerate_count,
+            abandon_count=len(runs) - save_count - regenerate_count,
+            precision=precision,
+            f1_score=f1,
+            avg_response_time_ms=sum(r.total_duration_ms for r in runs) // len(runs) if runs else 0,
+            total_cost_usd=sum(r.total_cost or 0 for r in runs),
+            prompt_versions={}  # Aggregate from runs
+        )
+        
+        self.stdout.write(f"📊 Metrics for {metrics.date}")
+        self.stdout.write(f"   F1 Score: {metrics.f1_score:.2%}")
+        self.stdout.write(f"   Precision: {metrics.precision:.2%}")
+        self.stdout.write(f"   Save Rate: {save_count}/{len(runs)}")
 ```
 
-### Weekly Report Template
+---
+
+## 8. Weekly Report Template
 
 ```markdown
 ## Weekly Quality Report - Week 3, 2026
@@ -247,206 +525,95 @@ class DailyMetrics:
 - Hard → Correct: 78%
 - Misrouted: 12%
 
+### 📝 Prompt A/B Test Results
+| Test | Control | Treatment | Winner |
+|------|---------|-----------|--------|
+| planner-v1.2 | 68% save | 73% save | Treatment ✅ |
+
 ### 💰 Cost Analysis
 - Total API cost: $45.20
 - Cost per generation: $0.032
 - Gemini Flash: 89% of calls, 23% of cost
 - GPT-4o: 11% of calls, 77% of cost
 
-### 🐛 Top Issues (from Regenerations)
-1. "Plan quá dày đặc" - 23 occurrences
-2. "Thiếu breaks" - 18 occurrences
-3. "Thời gian không hợp lý" - 12 occurrences
-
 ### 🎯 Action Items
-- [ ] Adjust Planner prompt to reduce density
-- [ ] Add explicit break scheduling rule
-- [ ] Review time estimation logic
+- [x] Promote planner-v1.2 to 100%
+- [ ] Investigate low Router accuracy for "project" inputs
+- [ ] Add more break scheduling in planner prompt
 ```
 
 ---
 
-## 6. Feedback Loop (Tự cải thiện)
+## 9. Targets & Alerts
 
-### Automatic Prompt Tuning
+### Quality Thresholds (Django settings)
 
 ```python
-async def analyze_failures_and_suggest_improvements():
-    """
-    Phân tích các plans bị regenerate nhiều,
-    đề xuất cải thiện prompt.
-    """
-    # 1. Lấy 20 plans bị regenerate >= 2 lần
-    failed_plans = await db.get_failed_plans(limit=20)
-    
-    # 2. Tìm pattern chung
-    analysis_prompt = """
-    Analyze these failed study plans and identify common issues:
-    {failed_plans}
-    
-    Output:
-    - Top 3 recurring problems
-    - Suggested prompt modifications
-    - Example improvements
-    """
-    
-    # 3. Update prompt suggestions (con người review)
-    suggestions = await llm.ainvoke(analysis_prompt)
-    await notify_team(suggestions)
+# config/settings/base.py
+QUALITY_THRESHOLDS = {
+    "f1_score": {
+        "warning": 0.65,
+        "critical": 0.55,
+        "target": 0.75,
+    },
+    "precision": {
+        "warning": 0.60,
+        "critical": 0.50,
+        "target": 0.70,
+    },
+    "avg_response_time_ms": {
+        "warning": 8000,
+        "critical": 15000,
+        "target": 5000,
+    },
+    "cost_per_generation_usd": {
+        "warning": 0.08,
+        "critical": 0.15,
+        "target": 0.05,
+    }
+}
 ```
 
-### A/B Testing Framework
+### Alert Task
 
 ```python
-class PromptExperiment:
-    """
-    Test 2 versions of prompt để xem version nào có F1 cao hơn.
-    """
-    def __init__(self, name: str, control: str, treatment: str):
-        self.name = name
-        self.control_prompt = control
-        self.treatment_prompt = treatment
-        self.traffic_split = 0.5  # 50/50
-        
-    async def get_prompt(self, session_id: str) -> str:
-        # Consistent assignment based on session
-        is_treatment = hash(session_id) % 100 < (self.traffic_split * 100)
-        return self.treatment_prompt if is_treatment else self.control_prompt
+# apps/feedback/tasks.py
+@shared_task
+def check_quality_alerts():
+    """Check metrics và send alerts nếu vượt threshold"""
+    from django.conf import settings
+    from .services import MetricsService
     
-    async def analyze_results(self, min_samples: int = 100) -> dict:
-        control_f1 = await self._calculate_f1("control")
-        treatment_f1 = await self._calculate_f1("treatment")
-        
-        return {
-            "control_f1": control_f1,
-            "treatment_f1": treatment_f1,
-            "winner": "treatment" if treatment_f1 > control_f1 else "control",
-            "confidence": self._calculate_significance()
-        }
+    metrics = MetricsService.get_latest()
+    thresholds = settings.QUALITY_THRESHOLDS
+    
+    alerts = []
+    
+    if metrics.f1_score < thresholds["f1_score"]["critical"]:
+        alerts.append(f"🚨 CRITICAL: F1 Score dropped to {metrics.f1_score:.2%}")
+    elif metrics.f1_score < thresholds["f1_score"]["warning"]:
+        alerts.append(f"⚠️ WARNING: F1 Score at {metrics.f1_score:.2%}")
+    
+    if alerts:
+        send_slack_notification(alerts)
 ```
 
 ---
 
-## 7. LangSmith Integration
-
-### Logging Code
-
-```python
-import os
-from langsmith import Client
-from langchain.callbacks import LangChainTracer
-
-# Setup
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "student-planner-prod"
-
-client = Client()
-
-# Create dataset for evaluation
-def log_for_evaluation(
-    run_id: str,
-    input_data: dict,
-    output_data: dict,
-    user_action: str
-):
-    """
-    Log data point cho F1 calculation.
-    """
-    client.create_example(
-        dataset_name="planner-quality-eval",
-        inputs=input_data,
-        outputs={
-            **output_data,
-            "user_action": user_action,
-            "is_positive": user_action == "save"
-        }
-    )
-```
-
-### Running Evaluation
-
-```python
-from langsmith.evaluation import evaluate
-
-def quality_evaluator(run, example):
-    """
-    Custom evaluator cho LangSmith.
-    """
-    prediction = run.outputs.get("json_plan", {})
-    reference_action = example.outputs.get("user_action")
-    
-    # Simple heuristic
-    if reference_action == "save":
-        return {"score": 1.0, "label": "positive"}
-    elif reference_action == "regenerate":
-        return {"score": 0.0, "label": "negative"}
-    else:
-        return {"score": 0.5, "label": "neutral"}
-
-# Run evaluation
-results = evaluate(
-    lambda x: generate_plan(x["input"]),
-    data="planner-quality-eval",
-    evaluators=[quality_evaluator],
-    experiment_prefix="prompt-v2"
-)
-
-print(f"Overall F1: {results.summary['f1_score']}")
-```
-
----
-
-## 8. Targets & Alerts
-
-### Quality Thresholds
-
-```yaml
-# alerts.yaml
-metrics:
-  f1_score:
-    warning: 0.65
-    critical: 0.55
-    target: 0.75
-    
-  precision:
-    warning: 0.60
-    critical: 0.50
-    target: 0.70
-    
-  avg_response_time_ms:
-    warning: 8000
-    critical: 15000
-    target: 5000
-    
-  cost_per_generation_usd:
-    warning: 0.08
-    critical: 0.15
-    target: 0.05
-
-alerts:
-  - name: "F1 Score Drop"
-    condition: "f1_score < warning for 1 hour"
-    action: "slack_notify"
-    
-  - name: "High Regenerate Rate"
-    condition: "regenerate_count / total > 0.4 for 30 min"
-    action: "slack_notify + pause_traffic"
-```
-
----
-
-## 9. Checklist Trước Production
+## 10. Checklist Trước Production
 
 - [ ] LangSmith project created và configured
+- [ ] Tracing enabled trong Django settings
 - [ ] Sampling rate set (5% default)
-- [ ] Judge prompt tested và validated
-- [ ] Daily metrics dashboard deployed
-- [ ] Alerting rules configured
+- [ ] Judge prompt pushed to LangSmith Hub
+- [ ] Daily metrics Celery task scheduled
+- [ ] Alerting configured (Slack/Email)
 - [ ] Feedback table in Firestore created
 - [ ] First 50 manual labels for baseline
-- [ ] A/B testing framework ready
+- [ ] A/B testing framework tested
 
 ---
 
-*Document version: 1.0*  
-*Last updated: 2026-01-18*
+*Document version: 2.0*  
+*Last updated: 2026-01-18*  
+*Framework: Django + LangSmith*
