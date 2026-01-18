@@ -4,12 +4,12 @@
 
 ## 🎯 Overview
 
-Hệ thống giúp sinh viên tự động tạo kế hoạch học tập từ syllabus và to-do list, sử dụng AI (Gemini Flash + GPT-4o) với Router thông minh để tối ưu chi phí và chất lượng.
+Hệ thống giúp sinh viên tự động tạo kế hoạch học tập từ syllabus và to-do list, sử dụng AI (Gemini 2.5 Flash + Gemini 2.5 Pro) với Router thông minh để tối ưu chi phí và chất lượng.
 
 ## ✨ Features
 
 - 📝 **Input linh hoạt**: Nhập syllabus, to-do list, hoặc mô tả tự do
-- 🤖 **AI Router**: Tự động chọn model phù hợp (Flash cho đơn giản, GPT-4o cho phức tạp)
+- 🤖 **AI Router**: Tự động chọn model phù hợp (Gemini 2.5 Flash cho đơn giản, Gemini 2.5 Pro cho phức tạp)
 - 🎨 **Generative UI**: AI tự tạo giao diện HTML/Tailwind đẹp mắt
 - 💾 **Lưu & Chia sẻ**: Lưu kế hoạch và chia sẻ với bạn bè
 - 📊 **Tự đánh giá**: Hệ thống tự tính F1 Score để cải thiện liên tục
@@ -37,8 +37,8 @@ Hệ thống giúp sinh viên tự động tạo kế hoạch học tập từ s
 │                    ┌─────────────┼─────────────┐            │
 │                    ▼             ▼             ▼            │
 │              ┌─────────┐  ┌──────────┐  ┌─────────┐        │
-│              │ Gemini  │  │  GPT-4o  │  │Firestore│        │
-│              │  Flash  │  │          │  │         │        │
+│              │ Gemini  │  │ Gemini   │  │Firestore│        │
+│              │2.5 Flash│  │ 2.5 Pro  │  │         │        │
 │              └─────────┘  └──────────┘  └─────────┘        │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -128,8 +128,7 @@ planing_for_students/
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GOOGLE_API_KEY` | ✅ | Gemini API key |
-| `OPENAI_API_KEY` | ✅ | OpenAI API key |
+| `GOOGLE_API_KEY` | ✅ | Gemini API key (for 2.5 Flash & 2.5 Pro) |
 | `LANGSMITH_API_KEY` | ⚪ | LangSmith tracing + Hub |
 | `FIREBASE_PROJECT_ID` | ✅ | Firebase project |
 | `DJANGO_SECRET_KEY` | ✅ | Django secret |
@@ -153,7 +152,7 @@ planing_for_students/
 - **Framework**: Django 5 + Django REST Framework
 - **Package Manager**: uv (Astral)
 - **AI Orchestration**: LangChain
-- **Models**: Gemini 1.5 Flash, GPT-4o
+- **Models**: Gemini 2.5 Flash, Gemini 2.5 Pro
 - **Observability**: LangSmith (Tracing + Prompt Hub)
 
 ### Infrastructure

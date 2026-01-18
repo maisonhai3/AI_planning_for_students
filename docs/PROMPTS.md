@@ -100,7 +100,7 @@ class PlannerService:
 
 **Hub Path:** `maisonhai3/router-classifier`  
 **Mục đích:** Phân loại input của sinh viên là "dễ" hay "khó" để route đến model phù hợp.  
-**Model:** Gemini 1.5 Flash
+**Model:** Gemini 2.5 Flash
 
 ### Template
 
@@ -122,7 +122,7 @@ Your job is to analyze the student's input and determine the COMPLEXITY level.
 - Less than 5 tasks/subjects
 - No conflicting constraints
 
-### HARD (Route to GPT-4o):
+### HARD (Route to Gemini 2.5 Pro):
 - Multiple subjects with complex dependencies
 - Exam preparation with time constraints
 - Project deadlines overlapping with exams
@@ -155,7 +155,7 @@ Respond with ONLY a JSON object:
 
 **Hub Path:** `maisonhai3/study-planner`  
 **Mục đích:** Tạo kế hoạch học tập có cấu trúc JSON từ input của sinh viên.  
-**Model:** Gemini 1.5 Flash (Easy) hoặc GPT-4o (Hard)
+**Model:** Gemini 2.5 Flash (Easy) hoặc Gemini 2.5 Pro (Hard)
 
 ### Template
 
@@ -245,7 +245,7 @@ Additional context:
 
 **Hub Path:** `maisonhai3/html-generator`  
 **Mục đích:** Chuyển đổi JSON plan thành HTML có thể render trong Iframe.  
-**Model:** Gemini 1.5 Flash
+**Model:** Gemini 2.5 Flash
 
 ### Template
 
@@ -315,7 +315,7 @@ Style preferences:
 
 **Hub Path:** `maisonhai3/quality-judge`  
 **Mục đích:** Đánh giá chất lượng kế hoạch học tập để tính F1 Score.  
-**Model:** GPT-4o (cần model mạnh nhất)
+**Model:** Gemini 2.5 Pro (cần model mạnh nhất)
 
 ### Template
 
@@ -389,7 +389,7 @@ Please evaluate this study plan.""")
 
 **Hub Path:** `maisonhai3/plan-refiner`  
 **Mục đích:** Cải thiện plan dựa trên feedback ngầm (user bấm Regenerate).  
-**Model:** GPT-4o
+**Model:** Gemini 2.5 Pro
 
 ### Template
 

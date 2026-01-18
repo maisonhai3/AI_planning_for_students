@@ -235,7 +235,7 @@ class PlannerService:
 │ Quality Review  │
 └────────┬────────┘
          │
-         ▼ GPT-4o Judge
+         ▼ Gemini 2.5 Pro Judge
 ┌─────────────────┐
 │ Scored Plans    │
 │ (5 criteria)    │
@@ -291,7 +291,7 @@ def evaluate_single_run(run_id: str):
     """
     Evaluate một run với LLM-as-a-Judge
     """
-    from langchain_openai import ChatOpenAI
+    from langchain_google_genai import ChatGoogleGenerativeAI
     from pydantic import BaseModel
     
     run = client.read_run(run_id)
@@ -305,7 +305,7 @@ def evaluate_single_run(run_id: str):
         overall_score: float
         verdict: str
     
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0)
     judge_prompt = PromptManager.get_prompt("judge")
     
     chain = judge_prompt | llm.with_structured_output(JudgeScore)
@@ -534,7 +534,7 @@ class Command(BaseCommand):
 - Total API cost: $45.20
 - Cost per generation: $0.032
 - Gemini Flash: 89% of calls, 23% of cost
-- GPT-4o: 11% of calls, 77% of cost
+- Gemini 2.5 Pro: 11% of calls, 77% of cost
 
 ### 🎯 Action Items
 - [x] Promote planner-v1.2 to 100%

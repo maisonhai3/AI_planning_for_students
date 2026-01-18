@@ -202,7 +202,7 @@ uv run python manage.py runserver
 - [ ] Test cases: Easy vs Hard inputs
 
 #### Ngày 3-4: Multi-Model Integration
-- [ ] Integrate GPT-4o cho Hard tasks
+- [ ] Integrate Gemini 2.5 Pro cho Hard tasks
 - [ ] Fallback mechanism nếu một model fail
 - [ ] Cost tracking per request
 
@@ -213,8 +213,8 @@ uv run python manage.py runserver
 
 **Deliverable Tuần 3:**
 ```
-✅ Requests đơn giản → Gemini Flash (rẻ, nhanh)
-✅ Requests phức tạp → GPT-4o (chính xác)
+✅ Requests đơn giản → Gemini 2.5 Flash (rẻ, nhanh)
+✅ Requests phức tạp → Gemini 2.5 Pro (chính xác)
 ✅ Streaming response cho UX tốt hơn
 ```
 
@@ -352,7 +352,7 @@ class PromptManager:
   output: {
     json_plan: {},      // Structured data
     html_content: "",   // Generated HTML
-    model_used: "gemini-flash" | "gpt-4o"
+    model_used: "gemini-2.5-flash" | "gemini-2.5-pro"
   },
   metadata: {
     created_at: Timestamp,
@@ -391,9 +391,8 @@ DJANGO_SECRET_KEY=
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 
-# AI Models
-GOOGLE_API_KEY=           # Gemini
-OPENAI_API_KEY=           # GPT-4o
+# AI Models (Gemini only - no OpenAI needed)
+GOOGLE_API_KEY=           # Gemini 2.5 Flash & Pro
 
 # LangSmith (Tracing + Prompt Versioning)
 LANGCHAIN_TRACING_V2=true
@@ -436,7 +435,7 @@ REDIS_URL=redis://localhost:6379
 | AI generates invalid HTML | High | Structured output + validation |
 | XSS through Iframe | Critical | Strict CSP + sandbox |
 | API costs exceed budget | Medium | Rate limiting + caching |
-| Gemini API downtime | Medium | Fallback to GPT-4o |
+| Gemini API downtime | Medium | Retry logic + user notification |
 | Slow response time | Medium | Django async + streaming |
 | Prompt regression | Medium | LangSmith versioning + A/B test |
 
@@ -456,9 +455,8 @@ REDIS_URL=redis://localhost:6379
 - [ ] Domain name (nếu cần)
 
 ### Cần từ Developer
-- [ ] Gemini API key (Google AI Studio)
-- [ ] OpenAI API key
-- [ ] LangSmith account + Hub access
+- [ ] Gemini API key (Google AI Studio) - for 2.5 Flash & Pro
+- [ ] LangSmith account + Hub access (Free tier)
 
 ---
 
