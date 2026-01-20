@@ -1,0 +1,77 @@
+{
+  "easy_inputs": [
+    {
+      "id": "easy_001",
+      "description": "Ôn thi đơn giản - 1 môn, 1 tuần",
+      "input": "Tuần sau tôi có bài kiểm tra môn Toán Cao Cấp.\nCần ôn tập 3 chương: Giới hạn, Đạo hàm, Tích phân.\nMỗi ngày tôi có thể học 2 tiếng buổi tối (19h-21h).",
+      "expected_complexity": "easy",
+      "expected_subjects": ["Toán Cao Cấp"],
+      "expected_duration_days": 7
+    },
+    {
+      "id": "easy_002",
+      "description": "Todo list đơn giản",
+      "input": "Cần hoàn thành:\n- Đọc chương 5 sách Vật Lý\n- Làm 10 bài tập cuối chương\n- Xem video bài giảng online\n\nThời gian: 3 ngày tới, mỗi ngày 3 tiếng.",
+      "expected_complexity": "easy",
+      "expected_subjects": ["Vật Lý"],
+      "expected_duration_days": 3
+    },
+    {
+      "id": "easy_003",
+      "description": "Lịch học tiếng Anh",
+      "input": "Tôi muốn học IELTS Writing Task 2.\nMục tiêu: Viết được 250 từ trong 40 phút.\nThời gian: 2 tuần, mỗi ngày 1.5 tiếng buổi sáng.",
+      "expected_complexity": "easy",
+      "expected_subjects": ["IELTS Writing"],
+      "expected_duration_days": 14
+    }
+  ],
+  "hard_inputs": [
+    {
+      "id": "hard_001",
+      "description": "Sinh viên năm 3 CNTT - nhiều môn + đồ án + thực tập",
+      "input": "Em là sinh viên năm 3 ngành CNTT. Học kỳ này em có:\n- Đồ án môn học (deadline 15/2)\n- Thi cuối kỳ 5 môn (từ 20/2 - 28/2): Mạng máy tính, CSDL, AI, Web, Mobile\n- Thực tập công ty part-time (T2, T4, T6 sáng)\n- Muốn học thêm AWS để thi chứng chỉ\n\nEm không biết sắp xếp thế nào vì đồ án còn dang dở mà thi cũng gần.\nBuổi tối em hay mệt nên chỉ học được nhẹ nhàng thôi.",
+      "expected_complexity": "hard",
+      "expected_subjects": ["Đồ án", "Mạng máy tính", "CSDL", "AI", "Web", "Mobile", "AWS"],
+      "expected_duration_days": 30
+    },
+    {
+      "id": "hard_002",
+      "description": "Ôn thi đại học - nhiều môn, áp lực thời gian",
+      "input": "Em sắp thi đại học khối A (Toán, Lý, Hóa).\nCòn 2 tháng nữa là thi.\nHiện tại:\n- Toán: Khá, cần ôn luyện đề\n- Lý: Trung bình, cần học lại một số chương\n- Hóa: Yếu, đặc biệt phần Hóa hữu cơ\n\nEm học ở trường sáng đến 11h30.\nChiều và tối có thể học, nhưng tối T7 và CN muốn nghỉ ngơi.\nMục tiêu: 8 điểm mỗi môn.",
+      "expected_complexity": "hard",
+      "expected_subjects": ["Toán", "Vật Lý", "Hóa học"],
+      "expected_duration_days": 60
+    },
+    {
+      "id": "hard_003",
+      "description": "Học song song nhiều kỹ năng",
+      "input": "Tôi muốn trong 3 tháng tới:\n1. Học Python từ cơ bản đến nâng cao\n2. Học Machine Learning\n3. Làm 2 projects để đưa vào portfolio\n4. Luyện LeetCode để phỏng vấn\n5. Học tiếng Anh giao tiếp\n\nTôi đi làm 9-6 các ngày trong tuần.\nChỉ có buổi tối (2-3 tiếng) và cuối tuần để học.\nCần lịch chi tiết và ưu tiên rõ ràng.",
+      "expected_complexity": "hard",
+      "expected_subjects": ["Python", "Machine Learning", "Projects", "LeetCode", "English"],
+      "expected_duration_days": 90
+    }
+  ],
+  "edge_cases": [
+    {
+      "id": "edge_001",
+      "description": "Input quá ngắn",
+      "input": "Học toán",
+      "expected_complexity": "easy",
+      "notes": "Should still work but with assumptions"
+    },
+    {
+      "id": "edge_002",
+      "description": "Input có tiếng Anh lẫn tiếng Việt",
+      "input": "I need to study for my midterm exam.\nMôn: Data Structures & Algorithms\nDeadline: next Friday\nI can study 4 hours per day.",
+      "expected_complexity": "easy",
+      "notes": "Should handle mixed languages"
+    },
+    {
+      "id": "edge_003",
+      "description": "Input không rõ ràng",
+      "input": "Tôi cần học nhưng không biết bắt đầu từ đâu. Có quá nhiều thứ cần làm. Cảm thấy overwhelmed.",
+      "expected_complexity": "hard",
+      "notes": "Vague input should route to Pro model for better interpretation"
+    }
+  ]
+}

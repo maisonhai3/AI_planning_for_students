@@ -1,0 +1,23 @@
+{
+  "name": "student-study-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered study planning system for Vietnamese university students",
+  "scripts": {
+    "dev": "pnpm --filter @app/web dev",
+    "dev:api": "cd apps/api && uv run python manage.py runserver",
+    "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:api\"",
+    "build": "pnpm --filter @app/web build",
+    "lint": "pnpm --filter @app/web lint",
+    "test": "pnpm --filter @app/web test",
+    "test:api": "cd apps/api && uv run python manage.py test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

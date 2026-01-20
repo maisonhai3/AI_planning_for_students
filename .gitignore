@@ -1,0 +1,38 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# General
+.DS_Store
+Thumbs.db
+*.swp
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/

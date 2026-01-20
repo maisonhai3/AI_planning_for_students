@@ -1,0 +1,158 @@
+{
+  "good_plan_criteria": {
+    "description": "Tiêu chí đánh giá một kế hoạch học tập tốt",
+    "version": "1.0",
+    
+    "criteria": {
+      "completeness": {
+        "weight": 0.2,
+        "description": "Đầy đủ - Bao phủ tất cả nội dung trong input",
+        "checkpoints": [
+          "Tất cả môn học/task được đề cập",
+          "Có review sessions",
+          "Có milestones rõ ràng",
+          "Không bỏ sót deadline quan trọng"
+        ]
+      },
+      
+      "feasibility": {
+        "weight": 0.25,
+        "description": "Khả thi - Có thể thực hiện được",
+        "checkpoints": [
+          "Khối lượng học mỗi ngày <= 6 tiếng",
+          "Có breaks giữa các sessions",
+          "Có buffer time cho unexpected events",
+          "Phù hợp với constraints của user (thời gian rảnh, sức khỏe)"
+        ]
+      },
+      
+      "pedagogical_soundness": {
+        "weight": 0.2,
+        "description": "Phương pháp học đúng",
+        "checkpoints": [
+          "Áp dụng spaced repetition (không dồn 1 môn liên tục)",
+          "Môn khó được schedule vào thời điểm tỉnh táo",
+          "Có đa dạng hoạt động (study, review, practice)",
+          "Review session trước deadline/thi"
+        ]
+      },
+      
+      "clarity": {
+        "weight": 0.2,
+        "description": "Rõ ràng - Dễ theo dõi",
+        "checkpoints": [
+          "Task descriptions cụ thể (không chung chung)",
+          "Thời gian bắt đầu/kết thúc rõ ràng",
+          "Priority được thể hiện",
+          "Dễ nhìn, dễ follow"
+        ]
+      },
+      
+      "personalization": {
+        "weight": 0.15,
+        "description": "Cá nhân hóa - Phù hợp với user",
+        "checkpoints": [
+          "Xem xét constraints của user",
+          "Tips relevant với tình huống cụ thể",
+          "Workload adapted theo thời gian available",
+          "Không generic, có customization"
+        ]
+      }
+    },
+    
+    "scoring": {
+      "scale": "1-5",
+      "verdicts": {
+        "good": ">= 4.0",
+        "acceptable": ">= 3.0 and < 4.0",
+        "poor": "< 3.0"
+      }
+    },
+    
+    "f1_calculation": {
+      "positive_signals": ["save", "share"],
+      "negative_signals": ["regenerate", "abandon"],
+      "formula": "2 * (precision * recall) / (precision + recall)",
+      "target": 0.7
+    }
+  },
+  
+  "example_good_plan": {
+    "title": "Kế hoạch ôn thi Toán Cao Cấp",
+    "start_date": "2026-01-20",
+    "end_date": "2026-01-26",
+    "subjects": [
+      {
+        "name": "Toán Cao Cấp",
+        "priority": "high",
+        "total_hours": 14,
+        "color": "#3b82f6"
+      }
+    ],
+    "schedule": [
+      {
+        "date": "2026-01-20",
+        "day_of_week": "Thứ Hai",
+        "sessions": [
+          {
+            "start_time": "19:00",
+            "end_time": "20:00",
+            "subject": "Toán Cao Cấp",
+            "task": "Ôn lại lý thuyết Giới hạn: Định nghĩa, các dạng vô định",
+            "type": "study",
+            "notes": "Đọc sách trước, ghi chú các công thức quan trọng"
+          },
+          {
+            "start_time": "20:00",
+            "end_time": "20:10",
+            "subject": "Break",
+            "task": "Nghỉ ngơi",
+            "type": "break",
+            "notes": null
+          },
+          {
+            "start_time": "20:10",
+            "end_time": "21:00",
+            "subject": "Toán Cao Cấp",
+            "task": "Làm 5 bài tập Giới hạn cơ bản",
+            "type": "practice",
+            "notes": "Bắt đầu từ bài dễ, tăng dần độ khó"
+          }
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "date": "2026-01-22",
+        "title": "Hoàn thành chương Giới hạn",
+        "description": "Nắm vững lý thuyết và làm được 80% bài tập"
+      },
+      {
+        "date": "2026-01-24",
+        "title": "Hoàn thành chương Đạo hàm",
+        "description": "Thuộc các công thức đạo hàm, làm được bài tập ứng dụng"
+      },
+      {
+        "date": "2026-01-26",
+        "title": "Hoàn thành ôn tập + Làm đề thử",
+        "description": "Ôn tổng hợp và làm 1 đề thi thử"
+      }
+    ],
+    "tips": [
+      "Học Giới hạn trước vì là nền tảng cho Đạo hàm và Tích phân",
+      "Ghi nhớ các công thức bằng flashcards",
+      "Làm bài tập ngay sau khi học lý thuyết để củng cố",
+      "Nếu gặp bài khó, đánh dấu lại và hỏi thầy/bạn ngày hôm sau"
+    ]
+  },
+  
+  "example_poor_plan": {
+    "issues": [
+      "Quá chung chung: 'Học Toán 2 tiếng' không cụ thể",
+      "Không có breaks",
+      "Dồn hết vào 1-2 ngày cuối",
+      "Không có review session",
+      "Tips generic không liên quan"
+    ]
+  }
+}
